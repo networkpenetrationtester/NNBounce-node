@@ -1,7 +1,5 @@
 {
 	"Debug": true,
-	"StoreCache": true,
-	"ServeCache": true,
 	"Logger": {
 		"Requests": true,
 		"Verbose": true,
@@ -12,12 +10,14 @@
 		"Enabled": true,
 		"LocalHostName": "localhost",
 		"LocalPort": 8080,
-		"Protocol": "http"
+		"Protocol": "http",
+		"StoreCache": true,
+		"ServeCache": true
 	},
 	"Bouncer": {
 		"Enabled": true,
-		"RemoteHostname": "localhost",
-		"RemotePort": 80,
-		"Protocol": "http"
+		"RemoteHostname": "resources.oldtanksonline.ru",
+		"RemotePort": 443,
+		"Protocol": "https"
 	}
 }

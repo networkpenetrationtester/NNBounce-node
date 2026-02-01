@@ -2,6 +2,7 @@ import express from 'express'
 import fs from 'node:fs';
 import { MIMEType } from 'node:util';
 import path from 'path';
+import axios from 'axios';
 
 const app = express();
 const dir = import.meta.dirname;
@@ -55,22 +56,8 @@ class Logger {
     }
 }
 
-const RequestLogger: express.RequestHandler = (req, res, next) => {
-    if (config.Logger.Requests)
-        logger.Log(
-            [
-                req.host,
-                req.method,
-                req.url,
-                req.body ? 'Request Body:' + JSON.stringify(req.body) : '\b',
-            ].join(' '));
-    return next();
-}
-
 type $config = {
     "Debug": boolean, // idk
-    "StoreCache": boolean,
-    "ServeCache": boolean,
     "Logger": {
         "Requests": boolean,
         "Verbose": boolean,
@@ -81,7 +68,10 @@ type $config = {
         "Enabled": boolean, // idk
         "LocalHostName": string,
         "LocalPort": number,
-        "Protocol": 'http'/*  | 'https' | 'ftp', */
+        "Protocol": 'http'/*  | 'https' | 'ftp', */,
+        "StoreCache": boolean,
+        "ServeCache": boolean,
+        "OverwriteCache": boolean,
     },
     "Bouncer": {
         "Enabled": boolean,
@@ -101,9 +91,21 @@ if (config.Logger.Verbose) {
     logger.Log(`* Program Started @ ${logger.CustomDate()}`, false);
     if (config.Bouncer.Enabled) logger.Log(`Remote Endpoint:\t${remote_full}`, false);
     if (config.HttpServer.Enabled) logger.Log(`Hosted Endpoint: \t${hosted_full}`, false);
-    logger.Log(`Storing Cache:\t\t${config.StoreCache}`, false);
-    logger.Log(`Serving Cache:\t\t${config.ServeCache}`, false);
+    logger.Log(`Storing Cache:\t\t${config.HttpServer.StoreCache}`, false);
+    logger.Log(`Serving Cache:\t\t${config.HttpServer.ServeCache}`, false);
     logger.Log('', false);
+}
+
+const RequestLogger: express.RequestHandler = (req, res, next) => {
+    if (config.Logger.Requests)
+        logger.Log(
+            [
+                req.host,
+                req.method,
+                req.url,
+                req.body ? 'Request Body:' + JSON.stringify(req.body) : '\b',
+            ].join(' '));
+    return next();
 }
 
 app.use(RequestLogger);
@@ -123,42 +125,43 @@ app.get('/socket_test.cfg', (req, res) => {
     return;
 });
 
-// async function GetResource(url: string, is_web: boolean, _config?: $config): Promise<string | null> {
-//     // I have no clue what I'm doing bro
-//     // Array buffers ain't work figure this shit out
-//     _config ??= config;
-//     if (is_web) {
-//         let webpath = _config.resource_url[_config.mode];
-//         console.log(`Forwarding to ${webpath + url}`);
-//         try {
-//             let resource = (await (await fetch(webpath + url)).text());
-//             return resource
-//         } catch (e) {
-//             console.log(e);
-//             return null;
-//         }
-//     } else {
-//         let filepath = path.join(_config.resource_url[_config.mode], url.split('?')[0]);
-//         if (fs.existsSync(filepath) && !fs.statSync(filepath).isDirectory()) {
-//             let file = fs.readFileSync(filepath, 'utf8');
-//             return file;
-//         } else {
-//             return null;
-//         }
-//     }
-// }
-
 app.get('/resources/*resource', async (req, res) => {
     let parts = req.url.split('?rand=');
-    let [filepath, rand] = parts;
-    console.log(path.join(import.meta.dirname, 'www', filepath));
-    // if protocol is not http or https, or origin is null, then its a local path maybe
-    // switch mode, direct to downloaded resources/otgithub if "modern", otherwise, forward to real resources server
+    let [request, rand] = parts;
 
-    // sanitize directory traversal
-    // if serve cache, check for cache, return
-    // if store cache, request from server, return
-    // handle accordingly for missing files in the event store is off and file doesnt exist
+    if (request.match(/([\\:?*"<>|]|\.{2})+/)) {
+        res.sendStatus(500);
+    }
+
+    let absolute_path = path.join(import.meta.dirname, 'www', request);
+    let exists = fs.existsSync(absolute_path);
+
+    if (!exists || !config.HttpServer.ServeCache) { // if the cached file doesn't exist or we don't wanna serve cache, download resource.
+        let url = remote_full + request + (rand ? '?rand=' + rand : '');
+        if (config.Logger.Verbose) {
+            logger.Log(`* Fetching ${url}...`);
+        }
+        await axios.get(url, { responseType: 'arraybuffer' })
+            .then((result) => {
+                let buffer = Buffer.from(result.data);
+                if (config.HttpServer.StoreCache) {
+                    fs.mkdirSync(path.dirname(absolute_path), { recursive: true });
+                    fs.writeFileSync(absolute_path, buffer);
+                }
+                res.send(buffer);
+                return;
+            })
+            .catch((e) => {
+                console.error(e);
+                res.sendStatus(500);
+                return;
+            });
+    }
+
+    if (exists && config.HttpServer.ServeCache) {
+        res.sendFile(absolute_path);
+        return;
+    }
 });
 
 app.listen(config.HttpServer.LocalPort, config.HttpServer.LocalHostName, () => {
