@@ -1,0 +1,23 @@
+{
+	"Debug": true,
+	"StoreCache": true,
+	"ServeCache": true,
+	"Logger": {
+		"Requests": true,
+		"Verbose": true,
+		"LogFile": false,
+		"Offset": 40
+	},
+	"HttpServer": {
+		"Enabled": true,
+		"LocalHostName": "localhost",
+		"LocalPort": 8080,
+		"Protocol": "http"
+	},
+	"Bouncer": {
+		"Enabled": true,
+		"RemoteHostname": "localhost",
+		"RemotePort": 80,
+		"Protocol": "http"
+	}
+}
