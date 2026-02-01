@@ -1,11 +1,9 @@
 import express from 'express'
 import fs from 'node:fs';
-import { MIMEType } from 'node:util';
 import path from 'path';
 import axios from 'axios';
 
 const app = express();
-const dir = import.meta.dirname;
 
 class Logger {
     verbose;
@@ -57,24 +55,20 @@ class Logger {
 }
 
 type $config = {
-    "Debug": boolean, // idk
+    "BasePath"?: string,
     "Logger": {
         "Requests": boolean,
         "Verbose": boolean,
         "LogFile": boolean,
-        "Offset": number //udk
     },
     "HttpServer": {
-        "Enabled": boolean, // idk
         "LocalHostName": string,
         "LocalPort": number,
         "Protocol": 'http'/*  | 'https' | 'ftp', */,
         "StoreCache": boolean,
         "ServeCache": boolean,
-        "OverwriteCache": boolean,
     },
     "Bouncer": {
-        "Enabled": boolean,
         "RemoteHostname": string,
         "RemotePort": number,
         "Protocol": 'http' | 'https' | 'ftp',
@@ -82,6 +76,8 @@ type $config = {
 }
 
 const config: $config = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
+const LOCAL_DIR = path.join(import.meta.dirname, 'www');
+const REDIRECT_DIR = config.BasePath ?? LOCAL_DIR;
 
 let logger = new Logger(true, false);
 let remote_full = `${config.Bouncer.Protocol}://${config.Bouncer.RemoteHostname}:${config.Bouncer.RemotePort}`;
@@ -89,8 +85,8 @@ let hosted_full = `${config.HttpServer.Protocol}://${config.HttpServer.LocalHost
 
 if (config.Logger.Verbose) {
     logger.Log(`* Program Started @ ${logger.CustomDate()}`, false);
-    if (config.Bouncer.Enabled) logger.Log(`Remote Endpoint:\t${remote_full}`, false);
-    if (config.HttpServer.Enabled) logger.Log(`Hosted Endpoint: \t${hosted_full}`, false);
+    logger.Log(`Remote Endpoint:\t${remote_full}`, false);
+    logger.Log(`Hosted Endpoint: \t${hosted_full}`, false);
     logger.Log(`Storing Cache:\t\t${config.HttpServer.StoreCache}`, false);
     logger.Log(`Serving Cache:\t\t${config.HttpServer.ServeCache}`, false);
     logger.Log('', false);
@@ -111,17 +107,16 @@ const RequestLogger: express.RequestHandler = (req, res, next) => {
 app.use(RequestLogger);
 
 app.get('/Prelauncher.swf', (req, res) => {
-    res.sendFile(path.join(dir, 'www', 'Prelauncher.swf'));
-    return;
+    res.sendFile(path.join(LOCAL_DIR, 'Prelauncher.swf'));
 });
 
 app.get('/Loader.swf', (req, res) => {
-    res.sendFile(path.join(dir, 'www', 'Loader.swf'));
+    res.sendFile(path.join(LOCAL_DIR, 'Loader.swf'));
     return;
 });
 
 app.get('/socket_test.cfg', (req, res) => {
-    res.sendFile(path.join(dir, 'www', 'socket_test.cfg'));
+    res.sendFile(path.join(LOCAL_DIR, 'socket_test.cfg'));
     return;
 });
 
@@ -133,7 +128,7 @@ app.get('/resources/*resource', async (req, res) => {
         res.sendStatus(500);
     }
 
-    let absolute_path = path.join(import.meta.dirname, 'www', request);
+    let absolute_path = path.join(REDIRECT_DIR, request);
     let exists = fs.existsSync(absolute_path);
 
     if (!exists || !config.HttpServer.ServeCache) { // if the cached file doesn't exist or we don't wanna serve cache, download resource.
@@ -149,18 +144,18 @@ app.get('/resources/*resource', async (req, res) => {
                     fs.writeFileSync(absolute_path, buffer);
                 }
                 res.send(buffer);
-                return;
             })
             .catch((e) => {
                 console.error(e);
                 res.sendStatus(500);
-                return;
             });
     }
 
     if (exists && config.HttpServer.ServeCache) {
+        if (config.Logger.Verbose) {
+            console.log(`* Serving ${absolute_path}`);
+        }
         res.sendFile(absolute_path);
-        return;
     }
 });
 

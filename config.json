@@ -1,21 +1,18 @@
 {
-	"Debug": true,
+	"BasePath": "E:\\Documents\\GitHub\\otgithub",
 	"Logger": {
 		"Requests": true,
 		"Verbose": true,
-		"LogFile": false,
-		"Offset": 40
+		"LogFile": false
 	},
 	"HttpServer": {
-		"Enabled": true,
 		"LocalHostName": "localhost",
 		"LocalPort": 8080,
 		"Protocol": "http",
-		"StoreCache": true,
+		"StoreCache": false,
 		"ServeCache": true
 	},
 	"Bouncer": {
-		"Enabled": true,
 		"RemoteHostname": "resources.oldtanksonline.ru",
 		"RemotePort": 443,
 		"Protocol": "https"
