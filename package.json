@@ -2,7 +2,8 @@
   "dependencies": {
     "@types/express": "^5.0.6",
     "axios": "^1.13.4",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "typescript": "^5.9.3"
   },
   "name": "otofileserver",
   "type": "module",
@@ -11,6 +12,12 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "pkg": {
+    "sourceType": "module",
+    "targets": [
+      "node22-win-x64"
+    ]
   },
   "author": "",
   "license": "ISC"

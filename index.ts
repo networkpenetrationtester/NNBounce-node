@@ -75,9 +75,11 @@ type $config = {
     }
 }
 
-const config: $config = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
-const LOCAL_DIR = path.join(import.meta.dirname, 'www');
-const REDIRECT_DIR = config.BasePath ?? LOCAL_DIR;
+const DIR = import.meta.dirname;
+const CONFIG_PATH = path.join(DIR, 'config.json');
+const config: $config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+const LOCAL_HTTP_CACHE = path.join(DIR, 'www');
+const CUSTOM_HTTP_CACHE = config.BasePath ?? LOCAL_HTTP_CACHE;
 
 let logger = new Logger(true, false);
 let remote_full = `${config.Bouncer.Protocol}://${config.Bouncer.RemoteHostname}:${config.Bouncer.RemotePort}`;
@@ -107,16 +109,16 @@ const RequestLogger: express.RequestHandler = (req, res, next) => {
 app.use(RequestLogger);
 
 app.get('/Prelauncher.swf', (req, res) => {
-    res.sendFile(path.join(LOCAL_DIR, 'Prelauncher.swf'));
+    res.sendFile(path.join(LOCAL_HTTP_CACHE, 'Prelauncher.swf'));
 });
 
 app.get('/Loader.swf', (req, res) => {
-    res.sendFile(path.join(LOCAL_DIR, 'Loader.swf'));
+    res.sendFile(path.join(LOCAL_HTTP_CACHE, 'Loader.swf'));
     return;
 });
 
 app.get('/socket_test.cfg', (req, res) => {
-    res.sendFile(path.join(LOCAL_DIR, 'socket_test.cfg'));
+    res.sendFile(path.join(LOCAL_HTTP_CACHE, 'socket_test.cfg'));
     return;
 });
 
@@ -128,7 +130,7 @@ app.get('/resources/*resource', async (req, res) => {
         res.sendStatus(500);
     }
 
-    let absolute_path = path.join(REDIRECT_DIR, request);
+    let absolute_path = path.join(CUSTOM_HTTP_CACHE, request);
     let exists = fs.existsSync(absolute_path);
 
     if (!exists || !config.HttpServer.ServeCache) { // if the cached file doesn't exist or we don't wanna serve cache, download resource.
