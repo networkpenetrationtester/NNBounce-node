@@ -22,7 +22,7 @@
   "main": "index.js",
   "scripts": {
     "test": "start node index.ts",
-    "build": "tsc --esModuleInterop --module 'nodenext' index.ts",
+    "build": "tsc --esModuleInterop --module nodenext index.ts && start node index.js",
     "run": "start node index.js"
   },
   "dependencies": {
