@@ -1,24 +1,34 @@
 {
+  "name": "nnbounce",
+  "version": "2.0.0",
+  "description": "Simple HTTP proxy. More features to come soon!",
+  "keywords": [
+    "http",
+    "proxy",
+    "server",
+    "express"
+  ],
+  "homepage": "https://github.com/networkpenetrationtester/NNBounce-node#readme",
+  "bugs": {
+    "url": "https://github.com/networkpenetrationtester/NNBounce-node/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/networkpenetrationtester/NNBounce-node.git"
+  },
+  "license": "ISC",
+  "author": "Neo",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "start node index.ts",
+    "build": "tsc --esModuleInterop --module 'nodenext' index.ts",
+    "run": "start node index.js"
+  },
   "dependencies": {
     "@types/express": "^5.0.6",
     "axios": "^1.13.4",
-    "express": "^5.2.1",
-    "typescript": "^5.9.3"
+    "express": "^5.2.1"
   },
-  "name": "nnbounce",
-  "type": "module",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "pkg": {
-    "sourceType": "module",
-    "targets": [
-      "node22-win-x64"
-    ]
-  },
-  "author": "",
-  "license": "ISC"
+  "devDependencies": {}
 }
