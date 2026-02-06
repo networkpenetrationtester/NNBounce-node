@@ -173,7 +173,7 @@ if (config.HttpServer.StaticFiles) { // Wow I did it, I made it universal...
     for (let file of config.HttpServer.StaticFiles) {
         config.Logger.Verbose && logger.Log(`* File will be statically served: ${file}`);
         app.get(file, (req, res) => {
-            let filepath = path.join(OVERRIDE_CACHE_PATH, file)
+            let filepath = path.join(HTTP_CACHE_PATH, file)
             if (fs.existsSync(filepath)) {
                 logger.LogTime(`* Serving Static: ${filepath}`);
                 res.sendFile(filepath);
@@ -199,7 +199,7 @@ function dirBrowse(real_path: string, web_path: string, checked: boolean = false
 }
 
 app.get('/', (req, res) => {
-    config.HttpServer.DirBrowser ? res.send(dirBrowse(HTTP_CACHE_PATH, '/')) : res.sendStatus(404);
+    config.HttpServer.DirBrowser ? res.send(dirBrowse(OVERRIDE_CACHE_PATH, '/')) : res.sendStatus(404);
     return;
 });
 
