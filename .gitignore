@@ -1,6 +1,6 @@
+!www/favicon.ico
+!logs/
+config.json
 node_modules/
 www/**
-!www/favicon.ico
 logs/**
-!logs
-config.json
