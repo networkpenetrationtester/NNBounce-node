@@ -1,15 +1,17 @@
 {
-	"BasePath": "",
 	"Logger": {
 		"Requests": true,
 		"Verbose": true,
 		"LogFile": false
 	},
 	"HttpServer": {
+		"OverrideCachePath": null,
+		"DirBrowser": false,
 		"StaticFiles": [
-			"Prelauncher.swf",
-			"Loader.swf",
-			"socket_test.cfg"
+			"/Prelauncher.swf",
+			"/Loader.swf",
+			"/socket_test.cfg",
+			"/favicon.ico"
 		],
 		"LocalHostName": "localhost",
 		"LocalPort": 8080,
