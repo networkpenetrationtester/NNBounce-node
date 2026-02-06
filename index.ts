@@ -171,7 +171,7 @@ app.use(RequestLogger);
 
 if (config.HttpServer.StaticFiles) { // Wow I did it, I made it universal...
     for (let file of config.HttpServer.StaticFiles) {
-        logger.Log(`* Exclusively serving from disk: ${file}`);
+        config.Logger.Verbose && logger.Log(`* File will be statically served: ${file}`);
         app.get(file, (req, res) => {
             let filepath = path.join(OVERRIDE_CACHE_PATH, file)
             if (fs.existsSync(filepath)) {
@@ -221,18 +221,18 @@ app.get('/*resource', async (req, res) => {
             return;
         }
 
-        if (!exists || !config.HttpServer.ServeCache) { // if the cached file doesn't exist or we don't wanna serve cache (updating content), download resource.
-            let url = REMOTE_ENDPOINT + request + (rand ? '?rand=' + rand : '');
-            if (config.Logger.Verbose) {
-                logger.LogTime(`* Fetching: ${url}`);
-            }
+        if (!exists || !config.HttpServer.ServeCache) { // if the cached file doesn't exist or we wanna update cache
+            let url = path.join(REMOTE_ENDPOINT, request) + rand ? '?rand=' + rand : '';
+            config.Logger.Verbose && logger.LogTime(`* Fetching: ${url}`);
             await axios.get(url, { responseType: 'arraybuffer' })
                 .then((result) => {
                     let buffer = Buffer.from(result.data);
-                    if (config.HttpServer.StoreCache) {
+                    if (config.HttpServer.StoreCache) { // if we wanna write to cache
                         fs.mkdirSync(path.dirname(absolute_path), { recursive: true });
+                        config.Logger.Verbose && logger.LogTime(`* Writing: ${url} -> ${absolute_path}`);
                         fs.writeFileSync(absolute_path, buffer);
                     }
+                    config.Logger.Verbose && logger.LogTime(`* Serving Buffered: ${url}`);
                     res.send(buffer);
                     return;
                 }).catch((e) => {
@@ -242,9 +242,7 @@ app.get('/*resource', async (req, res) => {
         }
 
         if (exists && config.HttpServer.ServeCache) {
-            if (config.Logger.Verbose) {
-                logger.LogTime(`* Serving Cached: ${absolute_path}`);
-            }
+            config.Logger.Verbose && logger.LogTime(`* Serving Cached: ${absolute_path}`);
             res.sendFile(absolute_path);
             return;
         }
@@ -255,5 +253,5 @@ app.get('/*resource', async (req, res) => {
 });
 
 app.listen(config.HttpServer.LocalPort, config.HttpServer.LocalHostName, () => {
-    logger.LogTime(`* HttpServer Forwarding ${HOSTED_ENDPOINT} -> ${REMOTE_ENDPOINT}.`);
+    logger.LogTime(`* HttpServer Forwarding: ${HOSTED_ENDPOINT} -> ${REMOTE_ENDPOINT}.`);
 });
