@@ -46,7 +46,7 @@ class Logger {
         try {
             fs.appendFileSync(this.filepath, line + '\n', 'utf-8');
         } catch (e) {
-            console.error(e); // this probably shouldn't happen, but yk just in case
+            console.error(e); // this probably shouldn't happen, but yk just in case the thing is deleted while in use
         }
     }
 
@@ -73,6 +73,7 @@ type $config = {
         "LogFile": boolean,
     },
     "HttpServer": {
+        "StaticFiles"?: string[]
         "LocalHostName": string,
         "LocalPort": number,
         "Protocol": 'http'/*  | 'https' | 'ftp', */,
@@ -86,7 +87,7 @@ type $config = {
     }
 }
 
-const logger = new Logger(true, true, 'Totally_Sick_Logger');
+const logger = new Logger(true, false);
 const DIR = import.meta.dirname;
 const HTTP_CACHE_PATH = path.join(DIR, 'www');
 const LOG_PATH = path.join(DIR, 'logs');
@@ -95,6 +96,7 @@ const config: $config = (() => {
     try {
         return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
     } catch (e) {
+        console.error(e);
         logger.Log(`* ERROR: ${CONFIG_PATH} failed to load! Proceeding with defaults...`);
         let config = {
             "OverrideCachePath": HTTP_CACHE_PATH,
@@ -104,6 +106,7 @@ const config: $config = (() => {
                 "LogFile": false
             },
             "HttpServer": {
+                "StaticFiles": null,
                 "LocalHostName": "localhost",
                 "LocalPort": 8080,
                 "Protocol": "http",
@@ -160,56 +163,62 @@ const RequestLogger: express.RequestHandler = (req, res, next) => {
 
 app.use(RequestLogger);
 
-app.get('/Prelauncher.swf', (req, res) => {
-    res.sendFile(path.join(HTTP_CACHE_PATH, 'Prelauncher.swf'));
-});
-
-app.get('/Loader.swf', (req, res) => {
-    res.sendFile(path.join(HTTP_CACHE_PATH, 'Loader.swf'));
-    return;
-});
-
-app.get('/socket_test.cfg', (req, res) => {
-    res.sendFile(path.join(HTTP_CACHE_PATH, 'socket_test.cfg'));
-    return;
-});
-
-app.get('/resources/*resource', async (req, res) => {
-    let parts = req.url.split('?rand=');
-    let [request, rand] = parts;
-
-    if (request.match(/([\\:?*"<>|]|\.{2})+/)) {
-        res.sendStatus(500);
+if (config.HttpServer.StaticFiles) {
+    for (let file of config.HttpServer.StaticFiles) {
+        logger.Log(`* Exclusively serving from disk: ${file}`);
+        app.get(file, (req, res) => {
+            let filepath = path.join(OVERRIDE_CACHE_PATH, file)
+            if (fs.existsSync(filepath)) {
+                res.sendFile(filepath);
+            } else {
+                res.send(404);
+            }
+        });
     }
+    logger.Log('');
+}
 
-    let absolute_path = path.join(OVERRIDE_CACHE_PATH, request);
-    let exists = fs.existsSync(absolute_path);
+app.get('/*resource', async (req, res) => {
+    try {
+        let parts = req.url.split('?rand=');
+        let [request, rand] = parts;
 
-    if (!exists || !config.HttpServer.ServeCache) { // if the cached file doesn't exist or we don't wanna serve cache (updating content), download resource.
-        let url = REMOTE_ENDPOINT + request + (rand ? '?rand=' + rand : '');
-        if (config.Logger.Verbose) {
-            logger.LogTime(`* Fetching: ${url}`);
+        if (request.match(/([\\:?*"<>|]|\.{2})+/)) {
+            res.sendStatus(500);
+            return;
         }
-        await axios.get(url, { responseType: 'arraybuffer' })
-            .then((result) => {
-                let buffer = Buffer.from(result.data);
-                if (config.HttpServer.StoreCache) {
-                    fs.mkdirSync(path.dirname(absolute_path), { recursive: true });
-                    fs.writeFileSync(absolute_path, buffer);
-                }
-                res.send(buffer);
-            })
-            .catch((e) => {
-                console.error(e);
-                res.sendStatus(500);
-            });
-    }
 
-    if (exists && config.HttpServer.ServeCache) {
-        if (config.Logger.Verbose) {
-            logger.LogTime(`* Serving Cached: ${absolute_path}`);
+        let absolute_path = path.join(OVERRIDE_CACHE_PATH, request);
+        let exists = fs.existsSync(absolute_path);
+
+        if (!exists || !config.HttpServer.ServeCache) { // if the cached file doesn't exist or we don't wanna serve cache (updating content), download resource.
+            let url = REMOTE_ENDPOINT + request + (rand ? '?rand=' + rand : '');
+            if (config.Logger.Verbose) {
+                logger.LogTime(`* Fetching: ${url}`);
+            }
+            await axios.get(url, { responseType: 'arraybuffer' })
+                .then((result) => {
+                    let buffer = Buffer.from(result.data);
+                    if (config.HttpServer.StoreCache) {
+                        fs.mkdirSync(path.dirname(absolute_path), { recursive: true });
+                        fs.writeFileSync(absolute_path, buffer);
+                    }
+                    res.send(buffer);
+                })
+                .catch((e) => {
+                    console.error(e);
+                    res.sendStatus(500);
+                });
         }
-        res.sendFile(absolute_path);
+
+        if (exists && config.HttpServer.ServeCache) {
+            if (config.Logger.Verbose) {
+                logger.LogTime(`* Serving Cached: ${absolute_path}`);
+            }
+            res.sendFile(absolute_path);
+        }
+    } catch (e) {
+        console.error(e);
     }
 });
 

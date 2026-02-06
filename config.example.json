@@ -6,6 +6,11 @@
 		"LogFile": false
 	},
 	"HttpServer": {
+		"StaticFiles": [
+			"Prelauncher.swf",
+			"Loader.swf",
+			"socket_test.cfg"
+		],
 		"LocalHostName": "localhost",
 		"LocalPort": 8080,
 		"Protocol": "http",
