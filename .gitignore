@@ -1,4 +1,6 @@
 node_modules/
 www/**
 !www
+logs/**
+!logs
 config.json
