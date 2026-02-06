@@ -23,7 +23,7 @@
   "scripts": {
     "test": "start node index.ts",
     "build": "npm install && tsc --esModuleInterop --module nodenext index.ts",
-    "run": "start node index.js"
+    "start": "start node index.js"
   },
   "dependencies": {
     "@types/express": "^5.0.6",
