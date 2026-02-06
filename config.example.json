@@ -7,12 +7,7 @@
 	"HttpServer": {
 		"OverrideCachePath": null,
 		"DirBrowser": false,
-		"StaticFiles": [
-			"/Prelauncher.swf",
-			"/Loader.swf",
-			"/socket_test.cfg",
-			"/favicon.ico"
-		],
+		"StaticFiles": ["file1.jpg", "file2.xml"],
 		"LocalHostName": "localhost",
 		"LocalPort": 8080,
 		"Protocol": "http",
@@ -20,7 +15,7 @@
 		"ServeCache": true
 	},
 	"Bouncer": {
-		"RemoteHostname": "resources.oldtanksonline.ru",
+		"RemoteHostname": "example.org",
 		"RemotePort": 443,
 		"Protocol": "https"
 	}
