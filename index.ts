@@ -10,12 +10,15 @@ class Logger {
     usefile;
     filename;
     filepath;
+    tag;
 
-    constructor(verbose: boolean, usefile: boolean) {
+    constructor(verbose: boolean, usefile: boolean, tag: string = 'NNBounce') {
         this.verbose = verbose;
         this.usefile = usefile;
+        this.tag = tag;
         this.filename = this.GetFileName();
         this.filepath = path.join('logs', this.filename);
+
         if (this.usefile) {
             if (!fs.existsSync(this.filepath)) {
                 fs.writeFileSync(this.filepath, '', 'utf-8');
@@ -31,12 +34,12 @@ class Logger {
     }
 
     GetFileName() {
-        return `NNBounce_${this.CustomDate().replaceAll(' ', '_').replaceAll(':', ';')}.txt`;
+        return `${this.tag}_${this.CustomDate().replaceAll(' ', '_').replaceAll(':', ';')}.txt`;
     }
 
     TimeStamp(line: string) {
         // DD/MM/YYYY, TT:TT:TT AM/PM
-        return `[${new Date().toTimeString().split(' ')[0]}]\t${line}`;
+        return `[${new Date().toTimeString().split(' ')[0]}] ${line}`;
     }
 
     LogFile(line: string) {
@@ -83,15 +86,16 @@ type $config = {
     }
 }
 
-const logger = new Logger(true, false);
+const logger = new Logger(true, true, 'Totally_Sick_Logger');
 const DIR = import.meta.dirname;
 const HTTP_CACHE_PATH = path.join(DIR, 'www');
+const LOG_PATH = path.join(DIR, 'logs');
 const CONFIG_PATH = path.join(DIR, 'config.json');
 const config: $config = (() => {
     try {
         return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
     } catch (e) {
-        logger.Log(`* ERROR: ${CONFIG_PATH} failed to load! Creating with defaults...`);
+        logger.Log(`* ERROR: ${CONFIG_PATH} failed to load! Proceeding with defaults...`);
         let config = {
             "OverrideCachePath": HTTP_CACHE_PATH,
             "Logger": {
@@ -111,9 +115,7 @@ const config: $config = (() => {
                 "RemotePort": 443,
                 "Protocol": "https"
             }
-            // possibly add static routes?
         };
-        fs.writeFileSync(CONFIG_PATH, JSON.stringify(config));
         return config;
     }
 })();
@@ -127,25 +129,32 @@ if (!fs.existsSync(HTTP_CACHE_PATH)) { // maybe some people would want this to b
     logger.Log(`* Created www directory: ${HTTP_CACHE_PATH}`);
 }
 
+if (!fs.existsSync(LOG_PATH)) {
+    fs.mkdirSync(LOG_PATH);
+    logger.Log(`* Created logs directory: ${LOG_PATH}`);
+}
+
 if (config.Logger.Verbose) {
     logger.Log(`* Program Started @ ${logger.CustomDate()}.`);
     logger.Log(`Remote Endpoint:\t${REMOTE_ENDPOINT}`);
     logger.Log(`Hosted Endpoint: \t${HOSTED_ENDPOINT}`);
-    logger.Log(`Cache Path:\t\t${config.OverrideCachePath}`);
+    logger.Log(`Cache Path: \t\t${config.OverrideCachePath}`);
     logger.Log(`Storing Cache:\t\t${config.HttpServer.StoreCache}`);
     logger.Log(`Serving Cache:\t\t${config.HttpServer.ServeCache}`);
     logger.Log('');
 }
 
 const RequestLogger: express.RequestHandler = (req, res, next) => {
-    if (config.Logger.Requests)
-        logger.LogTime(
-            [
-                req.host,
-                req.method,
-                req.url,
-                req.body ? 'Request Body:' + JSON.stringify(req.body) : '\b',
-            ].join(' '));
+    if (config.Logger.Requests) {
+        let strings = [
+            req.host,
+            req.method,
+            req.url,
+            req.body
+        ];
+        (req.method == 'POST' || !req.body) && strings.pop(); // ELITE TRICKERY!
+        logger.LogTime(strings.join(' '));
+    }
     return next();
 }
 
@@ -205,5 +214,5 @@ app.get('/resources/*resource', async (req, res) => {
 });
 
 app.listen(config.HttpServer.LocalPort, config.HttpServer.LocalHostName, () => {
-    logger.LogTime(`* HttpServer Mirroring ${HOSTED_ENDPOINT} -> ${REMOTE_ENDPOINT}.`);
+    logger.LogTime(`* HttpServer Forwarding ${HOSTED_ENDPOINT} -> ${REMOTE_ENDPOINT}.`);
 });
