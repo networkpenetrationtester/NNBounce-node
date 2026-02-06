@@ -199,7 +199,7 @@ function dirBrowse(real_path: string, web_path: string, checked: boolean = false
 }
 
 app.get('/', (req, res) => {
-    config.HttpServer.DirBrowser ? res.send(dirBrowse(OVERRIDE_CACHE_PATH, '/')) : res.sendStatus(404);
+    config.HttpServer.DirBrowser ? res.send(dirBrowse(HTTP_CACHE_PATH, '/')) : res.sendStatus(404);
     return;
 });
 
