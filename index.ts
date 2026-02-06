@@ -76,10 +76,14 @@ type $config = {
 }
 
 const DIR = import.meta.dirname;
+const LOCAL_HTTP_CACHE = path.join(DIR, 'www');
+if (!fs.existsSync(LOCAL_HTTP_CACHE)) {
+    fs.mkdirSync(LOCAL_HTTP_CACHE);
+}
 const CONFIG_PATH = path.join(DIR, 'config.json');
 const config: $config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-const LOCAL_HTTP_CACHE = path.join(DIR, 'www');
-const CUSTOM_HTTP_CACHE = config.BasePath ?? LOCAL_HTTP_CACHE;
+const OVERRIDE_HTTP_CACHE = config.BasePath ?? LOCAL_HTTP_CACHE;
+
 
 let logger = new Logger(true, false);
 let remote_full = `${config.Bouncer.Protocol}://${config.Bouncer.RemoteHostname}:${config.Bouncer.RemotePort}`;
@@ -130,7 +134,7 @@ app.get('/resources/*resource', async (req, res) => {
         res.sendStatus(500);
     }
 
-    let absolute_path = path.join(CUSTOM_HTTP_CACHE, request);
+    let absolute_path = path.join(OVERRIDE_HTTP_CACHE, request);
     let exists = fs.existsSync(absolute_path);
 
     if (!exists || !config.HttpServer.ServeCache) { // if the cached file doesn't exist or we don't wanna serve cache, download resource.
