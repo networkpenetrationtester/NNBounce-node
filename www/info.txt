@@ -1,0 +1,2 @@
+This is the folder where cached content is downloaded from the web.
+Not sure what side effects (if any) are present if this directory wasn't pushed.
