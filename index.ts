@@ -75,7 +75,7 @@ type $config = {
         "OverrideCachePath"?: string,
         "DirBrowser"?: boolean,
         "StaticFiles"?: string[],
-        "LocalHostName": string,
+        "LocalHostName"?: string,
         "LocalPort": number,
         "Protocol": 'http'/*  | 'https' | 'ftp', */,
         "StoreCache": boolean,
@@ -110,7 +110,7 @@ const config: $config = (() => {
             "HttpServer": {
                 "DirBrowser": false,
                 "StaticFiles": [],
-                "LocalHostName": "localhost",
+                "LocalHostName": null,
                 "LocalPort": 8080,
                 "Protocol": "http",
                 "StoreCache": false,
@@ -130,7 +130,7 @@ logger.usefile = config.Logger.LogFile; // oh well its rough but it works :3
 
 const OVERRIDE_CACHE_PATH = config.HttpServer.OverrideCachePath ?? HTTP_CACHE_PATH;
 const REMOTE_ENDPOINT = `${config.Bouncer.Protocol}://${config.Bouncer.RemoteHostname}:${config.Bouncer.RemotePort}`;
-const HOSTED_ENDPOINT = `${config.HttpServer.Protocol}://${config.HttpServer.LocalHostName}:${config.HttpServer.LocalPort}`;
+const HOSTED_ENDPOINT = `${config.HttpServer.Protocol}://${config.HttpServer.LocalHostName ?? '*'}:${config.HttpServer.LocalPort}`;
 
 if (!fs.existsSync(HTTP_CACHE_PATH)) { // maybe some people would want this to be created where the process is started? Most likely not though
     fs.mkdirSync(HTTP_CACHE_PATH);
@@ -252,6 +252,12 @@ app.get('/*resource', async (req, res) => {
     }
 });
 
-app.listen(config.HttpServer.LocalPort, config.HttpServer.LocalHostName, () => {
-    logger.LogTime(`* HttpServer Forwarding: ${HOSTED_ENDPOINT} -> ${REMOTE_ENDPOINT}.`);
-});
+if (config.HttpServer.LocalHostName) {
+    app.listen(config.HttpServer.LocalPort, config.HttpServer.LocalHostName, () => {
+        logger.LogTime(`* HttpServer Forwarding: ${HOSTED_ENDPOINT} -> ${REMOTE_ENDPOINT}.`);
+    });
+} else {
+    app.listen(config.HttpServer.LocalPort, () => {
+        logger.LogTime(`* HttpServer Forwarding: * -> ${REMOTE_ENDPOINT}.`);
+    });
+}
