@@ -67,25 +67,27 @@ class Logger {
 
 type $config = {
     "Logger": {
-        "Requests": boolean,
-        "Verbose": boolean,
-        "LogFile": boolean,
+        "Requests": boolean, // log HTTP requests
+        "Errors": boolean, // log various errors
+        "Info": boolean, // log info (verbose)
+        "LogFile": boolean, // output log to a file in ./logs
     },
     "HttpServer": {
-        "OverrideCachePath"?: string,
-        "DirBrowser"?: boolean,
-        "StaticFiles"?: string[],
-        "LocalHostName"?: string,
-        "LocalPort": number,
-        "Protocol": 'http'/*  | 'https' | 'ftp', */,
-        "StoreCache": boolean,
-        "ServeCache": boolean,
+        "StaticFiles"?: string[], // optionally specify files you do not want to ever be overwritten/ignored
+        "OverrideCachePath"?: string, // optionally redirect cache (except for static files) to another folder (null for ./www)
+        "DirBrowser"?: boolean, // primitive cache filebrowser
+        "LocalHostName"?: string, // local IP/hostname (null for any)
+        "LocalPort": number, // local port
+        "Protocol": ('http' | 'https' | 'ftp'), // local protocol, maybe implement soon
+        "RewriteCache": boolean, // download all files regardless of whether they're stored on disk
+        "WriteCache": boolean, // download files to disk when missing & available
+        "ServeCache": boolean, // send cached files from disk when possible
     },
     "Bouncer": {
-        "Enabled": boolean,
-        "RemoteHostname": string,
-        "RemotePort": number,
-        "Protocol": 'http' | 'https' | 'ftp',
+        "Enabled": boolean, // enable the HTTP proxy
+        "RemoteHostname": string, // remote IP/hostname
+        "RemotePort": number, // remote port
+        "Protocol": ('http' | 'https' | 'ftp') // remote protocol
     }
 }
 
@@ -100,27 +102,28 @@ const config: $config = (() => {
         console.error(e);
         console.log(`* ERROR: ${CONFIG_PATH} failed to load! Proceeding with defaults...`);
         return {
-            "BasePath": null,
-            "OverrideCachePath": HTTP_CACHE_PATH,
             "Logger": {
-                "Requests": true,
-                "Verbose": true,
-                "LogFile": false
+                "Requests": true, // log HTTP requests
+                "Errors": true, // log various errors
+                "Info": true, // log info (verbose)
+                "LogFile": false, // output log to a file in ./logs
             },
             "HttpServer": {
-                "DirBrowser": false,
-                "StaticFiles": [],
-                "LocalHostName": "localhost",
-                "LocalPort": 8080,
-                "Protocol": "http",
-                "StoreCache": false,
-                "ServeCache": true
+                "StaticFiles": [], // optionally specify files you do not want to ever be overwritten/ignored
+                "OverrideCachePath": null, // optionally redirect cache (except for static files) to another folder (null for ./www)
+                "DirBrowser": false, // primitive cache filebrowser
+                "LocalHostName": "localhost", // local IP/hostname (null for any)
+                "LocalPort": "8080", // local port
+                "Protocol": "http", // local protocol, maybe implement soon
+                "RewriteCache": false, // download all files regardless of whether they're stored on disk
+                "WriteCache": true, // download files to disk when missing & available
+                "ServeCache": true, // send cached files from disk when possible
             },
             "Bouncer": {
-                "Enabled": true,
-                "RemoteHostname": "example.com",
-                "RemotePort": 443,
-                "Protocol": "https"
+                "Enabled": true, // enable the HTTP proxy
+                "RemoteHostname": "example.org", // remote IP/hostname
+                "RemotePort": 443, // remote port
+                "Protocol": "https" // remote protocol
             }
         };
     }
@@ -142,13 +145,14 @@ if (!fs.existsSync(LOG_PATH)) {
 }
 
 logger.Log(`⏰ Program Started @ ${logger.CustomDate()}`);
-if (config.Logger.Verbose) {
+if (config.Logger.Info) {
     logger.Log(` ℹ Remote Endpoint:\t${REMOTE_ENDPOINT}`);
     logger.Log(` ℹ Hosted Endpoint: \t${HOSTED_ENDPOINT}`);
     logger.Log(` ℹ Cache Path: \t\t${OVERRIDE_CACHE_PATH}`);
     logger.Log(` ℹ Dir Browser:\t\t${config.HttpServer.DirBrowser ? 'enabled' : 'disabled'}`);
     logger.Log(` ℹ Bouncer:\t\t${config.Bouncer.Enabled ? 'enabled' : 'disabled'}`);
-    logger.Log(` ℹ Storing Cache:\t${config.HttpServer.StoreCache}`);
+    logger.Log(` ℹ Rewriting Cache:\t${config.HttpServer.RewriteCache}`);
+    logger.Log(` ℹ Writing Cache:\t${config.HttpServer.WriteCache}`);
     logger.Log(` ℹ Serving Cache:\t${config.HttpServer.ServeCache}`);
     logger.Log('');
 }
@@ -178,8 +182,8 @@ if (config.HttpServer.StaticFiles) { // Wow I did it, I made it universal...
 
         exists && logger.Log(` ℹ File will be statically served: ${file}`);
         !exists && logger.Log(`🚨 Static file mapping invalid! Attempting to request this will result in a 404: ${file}`);
-        app.get(file, (req, res) => {
-            config.Logger.Verbose && logger.LogTime(`${exists ? '🔒 Serving Static' : '🚨 No Such Static File'}: ${filepath}`);
+        app.get('/' + file, (req, res) => {
+            config.Logger.Info && logger.LogTime(`${exists ? '🔒 Serving Static' : '🚨 No Such Static File'}: ${filepath}`);
             exists ? res.sendFile(filepath) : res.sendStatus(404);
             return;
         });
@@ -188,7 +192,7 @@ if (config.HttpServer.StaticFiles) { // Wow I did it, I made it universal...
 }
 
 function dirBrowse(real_path: string, web_path: string, checked: boolean = false): string { // generate barebones html file browser
-    if (checked || fs.existsSync(real_path) && fs.statSync(real_path).isDirectory()) {
+    if (checked || (fs.existsSync(real_path) && fs.statSync(real_path).isDirectory())) {
         let children = ['..', ...fs.readdirSync(real_path)];
         let links = children.map((child) => {
             return `<div><a href="${path.join('/', web_path, child)}">${child}</a></div>`;
@@ -213,12 +217,11 @@ function dirBrowse(real_path: string, web_path: string, checked: boolean = false
 
 app.get('/', async (req, res) => {
     if (config.HttpServer.DirBrowser) {
-        res.type('.html');
         res.send(dirBrowse(OVERRIDE_CACHE_PATH, '/'));
         return;
     } else {
         let url = REMOTE_ENDPOINT;
-        config.Logger.Verbose && logger.LogTime(`🐕 Fetching: ${url}`);
+        config.Logger.Info && logger.LogTime(`🐕 Fetching: ${url}`);
         await axios.get(url)
             .then(async (result) => {
                 logger.LogTime(`📝 Serving Buffered: ${url}`);
@@ -245,30 +248,38 @@ app.get('/*resource', async (req, res) => {
         let absolute_path = path.join(OVERRIDE_CACHE_PATH, resource);
         let exists = fs.existsSync(absolute_path);
 
+        // handle shit for:
+        // serving from the disk exclusively, serving from online exclusively, and writing to the disk & serving that
+        
+        // if bouncer && (rewrite && exists || store && !exists) -> write to disk & send buffer content straight to client
+        // else
+        // if exists && serve && !rewrite -> send data from disk to client
+
+
         if (exists && fs.statSync(absolute_path).isDirectory()) {
             if (config.HttpServer.DirBrowser) {
-                res.type('.html');
+
                 res.send(dirBrowse(absolute_path, resource, true));
                 return;
             } else {
-                res.sendStatus(403);
+                res.sendStatus(429);
                 return;
             }
         }
 
-        if (!exists) {
-            config.Logger.Verbose && logger.LogTime(`🚨 No Such File/Directory: ${absolute_path}`);
+        if (!exists && (config.HttpServer.ServeCache || config.HttpServer.WriteCache)) { // only care if we're supposed to have that
+            config.Logger.Info && logger.LogTime(`🚨 No Such File/Directory: ${absolute_path}`);
         }
 
-        if (config.Bouncer.Enabled && (!exists || !config.HttpServer.ServeCache)) { // if the cached file doesn't exist or we wanna update cache and the bouncer is on
+        if (config.Bouncer.Enabled && !exists || !config.HttpServer.ServeCache) { // if the cached file doesn't exist or we wanna update cache and the bouncer is on
             let url = REMOTE_ENDPOINT + resource + (querystring ? '?' + querystring : '');
-            config.Logger.Verbose && logger.LogTime(`🐕 Fetching: ${url}`);
+            config.Logger.Info && logger.LogTime(`🐕 Fetching: ${url}`);
             await axios.get(url, { responseType: 'arraybuffer' }) // HAS to be array buffer, otherwise won't save to cache properly...
                 .then((result) => {
                     let buffer = Buffer.from(result.data);
-                    if (config.HttpServer.StoreCache) { // if we wanna write to cache
+                    if (config.HttpServer.WriteCache) { // if we wanna write to cache
                         fs.mkdirSync(path.dirname(absolute_path), { recursive: true });
-                        config.Logger.Verbose && logger.LogTime(`💿 Writing: ${url} -> ${absolute_path}`);
+                        config.Logger.Info && logger.LogTime(`💿 Writing: ${url} -> ${absolute_path}`);
                         fs.writeFileSync(absolute_path, buffer);
                     }
                     logger.LogTime(`📝 Serving Buffered: ${url}`);
