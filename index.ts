@@ -82,6 +82,7 @@ type $config = {
         "ServeCache": boolean,
     },
     "Bouncer": {
+        "Enabled": boolean,
         "RemoteHostname": string,
         "RemotePort": number,
         "Protocol": 'http' | 'https' | 'ftp',
@@ -116,7 +117,8 @@ const config: $config = (() => {
                 "ServeCache": true
             },
             "Bouncer": {
-                "RemoteHostname": "resources.oldtanksonline.ru",
+                "Enabled": true,
+                "RemoteHostname": "example.com",
                 "RemotePort": 443,
                 "Protocol": "https"
             }
@@ -145,6 +147,7 @@ if (config.Logger.Verbose) {
     logger.Log(`Hosted Endpoint: \t${HOSTED_ENDPOINT}`);
     logger.Log(`Cache Path: \t\t${OVERRIDE_CACHE_PATH}`);
     logger.Log(`Dir Browser:\t\t${config.HttpServer.DirBrowser ? 'enabled' : 'disabled'}`);
+    logger.Log(`Bouncer:\t\t${config.Bouncer.Enabled ? 'enabled' : 'disabled'}`);
     logger.Log(`Storing Cache:\t\t${config.HttpServer.StoreCache}`);
     logger.Log(`Serving Cache:\t\t${config.HttpServer.ServeCache}`);
     logger.Log('');
@@ -190,14 +193,43 @@ function dirBrowse(real_path: string, web_path: string, checked: boolean = false
         let links = children.map((child) => {
             return `<div><a href="${path.join('/', web_path, child)}">${child}</a></div>`;
         });
-        return ['<html>', '<body>', ...links, '</body>', '</html>'].join('\n');
+        return [
+            '<!DOCTYPE html>',
+            '<html>',
+            '<head>',
+            '<title>NNBounce File Browser</title>',
+            '</head>',
+            '<body>',
+            ...links,
+            '</body>',
+            '</html>'
+        ].join('\n');
     }
     return 'Not a Directory...';
 }
 
-app.get('/', (req, res) => {
-    config.HttpServer.DirBrowser ? res.send(dirBrowse(OVERRIDE_CACHE_PATH, '/')) : res.sendStatus(404);
-    return;
+app.get('/', async (req, res) => {
+    if (config.HttpServer.DirBrowser) {
+        res.type('html');
+        res.send(dirBrowse(OVERRIDE_CACHE_PATH, '/'));
+        return;
+    } else {
+        let url = REMOTE_ENDPOINT;
+        config.Logger.Verbose && logger.LogTime(`* Fetching: ${url}`);
+        await axios.get(url)
+            .then(async (result) => {
+                if (result.headers.getContentType instanceof Function) {
+                    let type = result.headers.getContentType()?.toString();
+                    type && res.type(type);
+                }
+                res.send(result.data);
+                return;
+            }).catch((e) => {
+                console.error(e);
+                res.sendStatus(e?.status || 500);
+                return;
+            });
+    }
 });
 
 app.get('/*resource', async (req, res) => {
@@ -214,12 +246,17 @@ app.get('/*resource', async (req, res) => {
         let exists = fs.existsSync(absolute_path);
 
         if (exists && fs.statSync(absolute_path).isDirectory()) {
-            config.HttpServer.DirBrowser ? res.send(dirBrowse(absolute_path, request, true)) : res.sendStatus(404);
-            return;
+            if (config.HttpServer.DirBrowser) {
+                res.send(dirBrowse(absolute_path, request, true));
+                return;
+            } else {
+                res.sendStatus(403);
+                return;
+            }
         }
 
-        if (!exists || !config.HttpServer.ServeCache) { // if the cached file doesn't exist or we wanna update cache
-            let url = path.join(REMOTE_ENDPOINT, request) + rand ? '?rand=' + rand : '';
+        if (config.Bouncer.Enabled && (!exists || !config.HttpServer.ServeCache)) { // if the cached file doesn't exist or we wanna update cache and the bouncer is on
+            let url = REMOTE_ENDPOINT + request + (rand ? '?rand=' + rand : '');
             config.Logger.Verbose && logger.LogTime(`* Fetching: ${url}`);
             await axios.get(url, { responseType: 'arraybuffer' })
                 .then((result) => {
@@ -230,6 +267,8 @@ app.get('/*resource', async (req, res) => {
                         fs.writeFileSync(absolute_path, buffer);
                     }
                     config.Logger.Verbose && logger.LogTime(`* Serving Buffered: ${url}`);
+                    res.type(path.extname(request));
+                    console.log(path.extname(request));
                     res.send(buffer);
                     return;
                 }).catch((e) => {
