@@ -133,55 +133,55 @@ const HOSTED_ENDPOINT = `${config.HttpServer.Protocol}://${config.HttpServer.Loc
 
 if (!fs.existsSync(HTTP_CACHE_PATH)) { // maybe some people would want this to be created where the process is started? Most likely not though
     fs.mkdirSync(HTTP_CACHE_PATH);
-    logger.Log(`* Created www directory: ${HTTP_CACHE_PATH}`);
+    logger.Log(`📁 Created www directory: ${HTTP_CACHE_PATH}`);
 }
 
 if (!fs.existsSync(LOG_PATH)) {
     fs.mkdirSync(LOG_PATH);
-    logger.Log(`* Created logs directory: ${LOG_PATH}`);
+    logger.Log(`📁 Created logs directory: ${LOG_PATH}`);
 }
 
+logger.Log(`⏰ Program Started @ ${logger.CustomDate()}`);
 if (config.Logger.Verbose) {
-    logger.Log(`* Program Started @ ${logger.CustomDate()}.`);
-    logger.Log(`Remote Endpoint:\t${REMOTE_ENDPOINT}`);
-    logger.Log(`Hosted Endpoint: \t${HOSTED_ENDPOINT}`);
-    logger.Log(`Cache Path: \t\t${OVERRIDE_CACHE_PATH}`);
-    logger.Log(`Dir Browser:\t\t${config.HttpServer.DirBrowser ? 'enabled' : 'disabled'}`);
-    logger.Log(`Bouncer:\t\t${config.Bouncer.Enabled ? 'enabled' : 'disabled'}`);
-    logger.Log(`Storing Cache:\t\t${config.HttpServer.StoreCache}`);
-    logger.Log(`Serving Cache:\t\t${config.HttpServer.ServeCache}`);
+    logger.Log(` ℹ Remote Endpoint:\t${REMOTE_ENDPOINT}`);
+    logger.Log(` ℹ Hosted Endpoint: \t${HOSTED_ENDPOINT}`);
+    logger.Log(` ℹ Cache Path: \t\t${OVERRIDE_CACHE_PATH}`);
+    logger.Log(` ℹ Dir Browser:\t\t${config.HttpServer.DirBrowser ? 'enabled' : 'disabled'}`);
+    logger.Log(` ℹ Bouncer:\t\t${config.Bouncer.Enabled ? 'enabled' : 'disabled'}`);
+    logger.Log(` ℹ Storing Cache:\t${config.HttpServer.StoreCache}`);
+    logger.Log(` ℹ Serving Cache:\t${config.HttpServer.ServeCache}`);
     logger.Log('');
 }
 
 const RequestLogger: express.RequestHandler = (req, res, next) => {
-    if (config.Logger.Requests) {
-        let strings = [
-            req.ips.length > 0 ? `[${req.ips.join(', ')}]` : req.ip,
-            req.method,
-            req.url,
-            req.body
-        ];
-        !req.body && strings.pop(); // ELITE TRICKERY!
-        logger.LogTime(strings.join(' '));
-    }
+    let strings = [
+        '🔽',
+        req.ips.length > 0 ? `[${req.ips.join(', ')}]` : req.ip,
+        req.method,
+        req.url,
+        req.body
+    ];
+    !req.body && strings.pop(); // ELITE TRICKERY!
+    logger.LogTime(strings.join(' '));
     return next();
 }
 
-app.use(RequestLogger);
+config.Logger.Requests && app.use(RequestLogger);
 
 if (config.HttpServer.StaticFiles) { // Wow I did it, I made it universal...
+    if (config.HttpServer.StaticFiles.length > 0) {
+        logger.Log('🔒 These files will not be overwritten by cache.');
+    }
     for (let file of config.HttpServer.StaticFiles) {
-        config.Logger.Verbose && logger.Log(`* File will be statically served: ${file}`);
+        let filepath = path.join(OVERRIDE_CACHE_PATH, file);
+        let exists = fs.existsSync(filepath);
+
+        exists && logger.Log(` ℹ File will be statically served: ${file}`);
+        !exists && logger.Log(`🚨 Static file mapping invalid! Attempting to request this will result in a 404: ${file}`);
         app.get(file, (req, res) => {
-            let filepath = path.join(HTTP_CACHE_PATH, file)
-            if (fs.existsSync(filepath)) {
-                logger.LogTime(`* Serving Static: ${filepath}`);
-                res.sendFile(filepath);
-                return;
-            } else {
-                res.send(404);
-                return;
-            }
+            config.Logger.Verbose && logger.LogTime(`${exists ? '🔒 Serving Static' : '🚨 No Such Static File'}: ${filepath}`);
+            exists ? res.sendFile(filepath) : res.sendStatus(404);
+            return;
         });
     }
     logger.Log('');
@@ -196,12 +196,15 @@ function dirBrowse(real_path: string, web_path: string, checked: boolean = false
         return [
             '<!DOCTYPE html>',
             '<html>',
-            '<head>',
-            '<title>NNBounce File Browser</title>',
-            '</head>',
-            '<body>',
-            ...links,
-            '</body>',
+            /****/'<head>',
+            /****//****/'<title>NNBounce File Browser</title>',
+            /****/'</head>',
+            /****/'<style>',
+            /****//****/'a { color: #00ffff; }',
+            /****/'</style>',
+            /****/'<body style="background: #000000">',
+            /****//****/...links,
+            /****/'</body>',
             '</html>'
         ].join('\n');
     }
@@ -215,18 +218,15 @@ app.get('/', async (req, res) => {
         return;
     } else {
         let url = REMOTE_ENDPOINT;
-        config.Logger.Verbose && logger.LogTime(`* Fetching: ${url}`);
+        config.Logger.Verbose && logger.LogTime(`🐕 Fetching: ${url}`);
         await axios.get(url)
             .then(async (result) => {
-                if (result.headers.getContentType instanceof Function) {
-                    let type = result.headers.getContentType()?.toString();
-                    type && res.type(type);
-                }
+                logger.LogTime(`📝 Serving Buffered: ${url}`);
                 res.send(result.data);
                 return;
             }).catch((e) => {
-                console.error(e);
-                res.sendStatus(e?.status || 500);
+                logger.LogTime(['❌', e.status, e.code].join(' '));
+                res.sendStatus(e.status);
                 return;
             });
     }
@@ -234,20 +234,20 @@ app.get('/', async (req, res) => {
 
 app.get('/*resource', async (req, res) => {
     try {
-        let parts = req.url.split('?rand=');
-        let [request, rand] = parts;
+        let parts = req.url.split('?');
+        let [resource, querystring] = parts;
 
-        if (request.match(/([\\:?*"<>|]|\.{2})+/)) {
+        if (resource.match(/([\\:?*"<>|]|\.{2})+/)) {
             res.sendStatus(418); // No hacking for you!
             return;
         }
 
-        let absolute_path = path.join(OVERRIDE_CACHE_PATH, request);
+        let absolute_path = path.join(OVERRIDE_CACHE_PATH, resource);
         let exists = fs.existsSync(absolute_path);
 
         if (exists && fs.statSync(absolute_path).isDirectory()) {
             if (config.HttpServer.DirBrowser) {
-                res.send(dirBrowse(absolute_path, request, true));
+                res.send(dirBrowse(absolute_path, resource, true));
                 return;
             } else {
                 res.sendStatus(403);
@@ -255,32 +255,36 @@ app.get('/*resource', async (req, res) => {
             }
         }
 
+        if (!exists) {
+            config.Logger.Verbose && logger.LogTime(`🚨 No Such File/Directory: ${absolute_path}`);
+        }
+
         if (config.Bouncer.Enabled && (!exists || !config.HttpServer.ServeCache)) { // if the cached file doesn't exist or we wanna update cache and the bouncer is on
-            let url = REMOTE_ENDPOINT + request + (rand ? '?rand=' + rand : '');
-            config.Logger.Verbose && logger.LogTime(`* Fetching: ${url}`);
-            await axios.get(url, { responseType: 'arraybuffer' })
+            let url = REMOTE_ENDPOINT + resource + (querystring ? '?' + querystring : '');
+            config.Logger.Verbose && logger.LogTime(`🐕 Fetching: ${url}`);
+            await axios.get(url, { responseType: 'arraybuffer' }) // HAS to be array buffer, otherwise won't save to cache properly...
                 .then((result) => {
                     let buffer = Buffer.from(result.data);
                     if (config.HttpServer.StoreCache) { // if we wanna write to cache
                         fs.mkdirSync(path.dirname(absolute_path), { recursive: true });
-                        config.Logger.Verbose && logger.LogTime(`* Writing: ${url} -> ${absolute_path}`);
+                        config.Logger.Verbose && logger.LogTime(`💿 Writing: ${url} -> ${absolute_path}`);
                         fs.writeFileSync(absolute_path, buffer);
                     }
-                    config.Logger.Verbose && logger.LogTime(`* Serving Buffered: ${url}`);
-                    res.type(path.extname(request));
-                    console.log(path.extname(request));
+                    logger.LogTime(`📝 Serving Buffered: ${url}`);
+                    let type = path.extname(resource);
+                    type && res.type(type);
                     res.send(buffer);
                     return;
                 }).catch((e) => {
-                    console.error(e);
-                    res.sendStatus(e?.status || 500);
+                    logger.LogTime(['❌', e.status, e.code].join(' '));
+                    res.sendStatus(e.status);
                     return;
                 });
         }
 
         if (exists && config.HttpServer.ServeCache) {
-            config.Logger.Verbose && logger.LogTime(`* Serving Cached: ${absolute_path}`);
-            res.sendFile(absolute_path);
+            logger.LogTime(`💿 Serving Cached: ${absolute_path}`);
+            res.sendFile(absolute_path); // automatically sets response type.
             return;
         }
     } catch (e) {
@@ -289,12 +293,14 @@ app.get('/*resource', async (req, res) => {
     }
 });
 
+let message = `🌐 HttpServer ${config.Bouncer.Enabled ? 'Proxying' : 'Running'}: ${HOSTED_ENDPOINT}${config.Bouncer.Enabled ? ' -> ' + REMOTE_ENDPOINT : ''}\n`;
+
 if (config.HttpServer.LocalHostName) {
     app.listen(config.HttpServer.LocalPort, config.HttpServer.LocalHostName, () => {
-        logger.LogTime(`* HttpServer Forwarding: ${HOSTED_ENDPOINT} -> ${REMOTE_ENDPOINT}.`);
+        logger.LogTime(message);
     });
 } else {
     app.listen(config.HttpServer.LocalPort, () => {
-        logger.LogTime(`* HttpServer Forwarding: * -> ${REMOTE_ENDPOINT}.`);
+        logger.LogTime(message);
     });
 }
