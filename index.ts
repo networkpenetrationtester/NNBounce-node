@@ -153,7 +153,7 @@ if (config.Logger.Verbose) {
 const RequestLogger: express.RequestHandler = (req, res, next) => {
     if (config.Logger.Requests) {
         let strings = [
-            req.ips ? `[${req.ips.join(', ')}]` : req.ip,
+            req.ips.length > 0 ? `[${req.ips.join(', ')}]` : req.ip,
             req.method,
             req.url,
             req.body
