@@ -92,14 +92,13 @@ const DIR = import.meta.dirname;
 const HTTP_CACHE_PATH = path.join(DIR, 'www');
 const LOG_PATH = path.join(DIR, 'logs');
 const CONFIG_PATH = path.join(DIR, 'config.json');
-const logger = new Logger(true, false); // circular dependency headass
 const config: $config = (() => {
     try {
         return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
     } catch (e) {
         console.error(e);
-        logger.Log(`* ERROR: ${CONFIG_PATH} failed to load! Proceeding with defaults...`);
-        let config = {
+        console.log(`* ERROR: ${CONFIG_PATH} failed to load! Proceeding with defaults...`);
+        return {
             "BasePath": null,
             "OverrideCachePath": HTTP_CACHE_PATH,
             "Logger": {
@@ -110,7 +109,7 @@ const config: $config = (() => {
             "HttpServer": {
                 "DirBrowser": false,
                 "StaticFiles": [],
-                "LocalHostName": null,
+                "LocalHostName": "localhost",
                 "LocalPort": 8080,
                 "Protocol": "http",
                 "StoreCache": false,
@@ -122,12 +121,10 @@ const config: $config = (() => {
                 "Protocol": "https"
             }
         };
-        return config;
     }
 })();
 
-logger.usefile = config.Logger.LogFile; // oh well its rough but it works :3
-
+const logger = new Logger(true, config.Logger.LogFile); // circular dependency headass
 const OVERRIDE_CACHE_PATH = config.HttpServer.OverrideCachePath ?? HTTP_CACHE_PATH;
 const REMOTE_ENDPOINT = `${config.Bouncer.Protocol}://${config.Bouncer.RemoteHostname}:${config.Bouncer.RemotePort}`;
 const HOSTED_ENDPOINT = `${config.HttpServer.Protocol}://${config.HttpServer.LocalHostName ?? '*'}:${config.HttpServer.LocalPort}`;
@@ -156,12 +153,12 @@ if (config.Logger.Verbose) {
 const RequestLogger: express.RequestHandler = (req, res, next) => {
     if (config.Logger.Requests) {
         let strings = [
-            req.host,
+            `[${req.ips.join(', ')}]`,
             req.method,
             req.url,
             req.body
         ];
-        (req.method == 'POST' || !req.body) && strings.pop(); // ELITE TRICKERY!
+        !req.body && strings.pop(); // ELITE TRICKERY!
         logger.LogTime(strings.join(' '));
     }
     return next();
@@ -236,6 +233,7 @@ app.get('/*resource', async (req, res) => {
                     res.send(buffer);
                     return;
                 }).catch((e) => {
+                    console.error(e);
                     res.sendStatus(e?.status || 500);
                     return;
                 });
