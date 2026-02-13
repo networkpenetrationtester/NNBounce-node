@@ -170,10 +170,10 @@ config.Logger.Requests && app.use(RequestLogger);
 
 if (config.HttpServer.StaticFiles) { // Wow I did it, I made it universal...
     if (config.HttpServer.StaticFiles.length > 0) {
-        logger.Log('🔒 These files will not be overwritten by cache.');
+        logger.Log(`🔒 These files will not be overwritten by cache (${HTTP_CACHE_PATH})`);
     }
     for (let file of config.HttpServer.StaticFiles) {
-        let filepath = path.join(OVERRIDE_CACHE_PATH, file);
+        let filepath = path.join(HTTP_CACHE_PATH, file);
         let exists = fs.existsSync(filepath);
 
         exists && logger.Log(` ℹ File will be statically served: ${file}`);
@@ -208,12 +208,12 @@ function dirBrowse(real_path: string, web_path: string, checked: boolean = false
             '</html>'
         ].join('\n');
     }
-    return 'Not a Directory...';
+    return '404';
 }
 
 app.get('/', async (req, res) => {
     if (config.HttpServer.DirBrowser) {
-        res.type('html');
+        res.type('.html');
         res.send(dirBrowse(OVERRIDE_CACHE_PATH, '/'));
         return;
     } else {
@@ -247,6 +247,7 @@ app.get('/*resource', async (req, res) => {
 
         if (exists && fs.statSync(absolute_path).isDirectory()) {
             if (config.HttpServer.DirBrowser) {
+                res.type('.html');
                 res.send(dirBrowse(absolute_path, resource, true));
                 return;
             } else {
