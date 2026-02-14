@@ -1,0 +1,32 @@
+{
+	"Logger": {
+		"Requests": true,
+		"Responses": true,
+		"Info": true,
+		"Warn": true,
+		"Error": true,
+		"LogFile": false
+	},
+	"HttpServer": {
+		"StaticPaths": [
+			"apple.png",
+			"README.md",
+			"stuff/folder_1",
+			"test-file.txt"
+		],
+		"OverrideCachePath": "C:\\Users\\Admin\\Downloads\\folder",
+		"DirectoryBrowser": false,
+		"LocalHostName": "localhost",
+		"LocalPort": 6969,
+		"Protocol": "http",
+		"WriteCache": true,
+		"RewriteCache": false,
+		"ServeCache": true
+	},
+	"Bouncer": {
+		"Enabled": true,
+		"RemoteHostname": "example.org",
+		"RemotePort": 443,
+		"Protocol": "https"
+	}
+}
