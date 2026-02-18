@@ -284,8 +284,7 @@ if (config.HttpServer.StaticPaths) {
                         config.HttpServer.DirectoryBrowser ? res.send(DirectoryBrowser(full_p, resource, true)) : res.sendStatus(403);
                         config.HttpServer.DirectoryBrowser ? config.Logger.Responses && logger.LogCustomTimed(`Serving directory browser: ${full_p}`, '📁') : logger.WarnTimed(`Directory browser is off [403]`);
                         return;
-                    }
-                    else {
+                    } else {
                         res.sendFile(full_p);
                         config.Logger.Responses && logger.LogCustomTimed(`Serving cached: ${full_p}`, '💿')
                         return;
