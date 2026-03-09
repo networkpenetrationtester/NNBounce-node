@@ -1,5 +1,6 @@
 :: Make sure server is closed.
 taskkill /IM node.exe /F
+cls
 
 :: Audit fix, download dependencies, build, and run!
 node.exe --run build

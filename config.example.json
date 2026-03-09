@@ -14,7 +14,7 @@
 			"stuff/folder_1",
 			"test-file.txt"
 		],
-		"OverrideCachePath": "C:\\Users\\Admin\\Downloads\\folder",
+		"OverrideCachePath": "C:\\Users\\Admin\\Downloads\\folder OR /home/users/admin/downloads/folder",
 		"DirectoryBrowser": false,
 		"LocalHostName": "localhost",
 		"LocalPort": 6969,

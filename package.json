@@ -21,13 +21,14 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "start node index.ts",
+    "test": "node index.ts",
     "build": "npm audit fix && npm install && tsc --esModuleInterop --module nodenext index.ts",
-    "start": "start /b node index.js"
+    "start": "node index.js"
   },
   "dependencies": {
     "@types/express": "^5.0.6",
     "axios": "^1.13.4",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "typescript": "^5.9.3"
   }
 }
