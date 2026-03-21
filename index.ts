@@ -105,8 +105,8 @@ type $config = {
     },
     "Bouncer": {
         "Enabled": boolean, // enable the HTTP proxy
-        "RemoteHostname": string, // remote IP/hostname
-        "RemotePort": number, // remote port
+        "RemoteHostname": string, // remote IP/hostname (can specify a url to a specific folder, just set RemotePort to null to override.)
+        "RemotePort"?: number, // remote port
         "Protocol": ('http' | 'https' | 'ftp') // remote protocol
     }
 }
@@ -224,7 +224,7 @@ const CONFIG_PATH = path.join(DIR, 'config.json');
 const config: $config = ConfigLoader();
 const logger = new Logger(config.Logger.LogFile, { info: config.Logger.Info, warn: config.Logger.Warn, error: config.Logger.Error });
 const OVERRIDE_CACHE_PATH = config.HttpServer.OverrideCachePath ?? HTTP_CACHE_PATH; // defaults to full ./www path
-const REMOTE_ENDPOINT = `${config.Bouncer.Protocol}://${config.Bouncer.RemoteHostname}:${config.Bouncer.RemotePort}`;
+const REMOTE_ENDPOINT = `${config.Bouncer.Protocol}://${config.Bouncer.RemoteHostname}${config.Bouncer.RemotePort ? ':' + config.Bouncer.RemotePort : ''}`;
 const HOSTED_ENDPOINT = `${config.HttpServer.Protocol}://${config.HttpServer.LocalHostName ?? '*'}:${config.HttpServer.LocalPort}`; // defaults to binding all interfaces, indicate this
 
 if (!fs.existsSync(HTTP_CACHE_PATH)) { // maybe in the future add a config option to deploy this in multiple directories
