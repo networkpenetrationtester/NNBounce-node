@@ -199,7 +199,7 @@ async function GetData(url: string) {
             return result.data;
         }).catch((e) => {
             // res.sendStatus(e.status);
-            logger.ErrorTimed([e.status, e.code].join(' '));
+            logger.ErrorTimed(['GetData', url, e.status, e.code].join(' '));
             return null;
         });
 }
@@ -212,7 +212,7 @@ async function GetBuffer(url: string) {
             return buffer;
         }).catch((e) => {
             // res.sendStatus(e.status);
-            logger.ErrorTimed([e.status, e.code].join(' '));
+            logger.ErrorTimed(['GetBuffer', url, e.status, e.code].join(' '));
             return null;
         });
 }
@@ -356,6 +356,10 @@ app.get('/*resource', async (req, res) => {
         console.error(e);
         res.send(500);
     }
+});
+
+app.post('/*resource', async (req, res) => {
+   console.log('Got a post request!', req.url);
 });
 
 let message = `🌐 HttpServer ${config.Bouncer.Enabled ? 'Proxying' : 'Running'}: ${HOSTED_ENDPOINT}${config.Bouncer.Enabled ? ' -> ' + REMOTE_ENDPOINT : ''}\n`;
