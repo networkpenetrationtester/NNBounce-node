@@ -84,30 +84,30 @@ class Logger {
 }
 
 type $config = {
-    "Logger": {
-        "Requests": boolean, // log HTTP requests
-        "Responses": boolean, // log HTTP responses
-        "Info": boolean, // log info (verbose)
-        "Warn": boolean,
-        "Error": boolean, // log various errors
-        "LogFile": boolean, // output log to a file in ./logs
+    Logger: {
+        Requests: boolean, // log HTTP requests
+        Responses: boolean, // log HTTP responses
+        Info: boolean, // log info (verbose)
+        Warn: boolean,
+        Error: boolean, // log various errors
+        LogFile: boolean, // output log to a file in ./logs
     },
-    "HttpServer": {
-        "StaticPaths"?: string[], // optionally specify files or entire directories to blacklist from all non-read activities (do not specify leading /)
-        "OverrideCachePath"?: string, // optionally redirect cache (except for static files) to another folder (null for ./www)
-        "DirectoryBrowser"?: boolean, // primitive cache filebrowser
-        "LocalHostName"?: string, // local IP/hostname (null for any)
-        "LocalPort": number, // local port
-        "Protocol": ('http' | 'https' | 'ftp'), // local protocol, maybe implement soon
-        "RewriteCache": boolean, // download all files regardless of whether they're stored on disk
-        "WriteCache": boolean, // download files to disk when missing & available
-        "ServeCache": boolean, // send cached files from disk when possible
+    HttpServer: {
+        StaticPaths?: string[], // optionally specify files or entire directories to blacklist from all non-read activities (do not specify leading /)
+        OutputOrOverridePath?: string, // optionally redirect cache (except for static files) to another folder (null for ./www)
+        DirectoryBrowser?: boolean, // primitive cache filebrowser
+        LocalHostName?: string, // local IP/hostname (null for any)
+        LocalPort: number, // local port
+        Protocol: ('http' | 'https' | 'ftp'), // local protocol, maybe implement soon
+        RewriteCache: boolean, // download all files regardless of whether they're stored on disk
+        WriteCache: boolean, // download files to disk when missing & available
+        ServeCache: boolean, // send cached files from disk when possible
     },
-    "Bouncer": {
-        "Enabled": boolean, // enable the HTTP proxy
-        "RemoteHostname": string, // remote IP/hostname (can specify a url to a specific folder, just set RemotePort to null to override.)
-        "RemotePort"?: number, // remote port
-        "Protocol": ('http' | 'https' | 'ftp') // remote protocol
+    Bouncer: {
+        Enabled: boolean, // enable the HTTP proxy
+        RemoteHostname: string, // remote IP/hostname (can specify a url to a specific folder, just set RemotePort to null to override.)
+        RemotePort?: number, // remote port
+        Protocol: ('http' | 'https' | 'ftp') // remote protocol
     }
 }
 
@@ -129,6 +129,7 @@ const ConfigLoader = () => {
             "HttpServer": {
                 "StaticPaths": [],
                 "OverrideCachePath": null,
+                "OutputPath": path.join(DIR, 'www'),
                 "DirectoryBrowser": false,
                 "LocalHostName": "localhost",
                 "LocalPort": "8080",
@@ -218,14 +219,13 @@ async function GetBuffer(url: string) {
 }
 
 const DIR = import.meta.dirname;
-const HTTP_CACHE_PATH = path.join(DIR, 'www');
 const LOG_PATH = path.join(DIR, 'logs');
 const CONFIG_PATH = path.join(DIR, 'config.json');
 const config: $config = ConfigLoader();
 const logger = new Logger(config.Logger.LogFile, { info: config.Logger.Info, warn: config.Logger.Warn, error: config.Logger.Error });
-const OVERRIDE_CACHE_PATH = config.HttpServer.OverrideCachePath ?? HTTP_CACHE_PATH; // defaults to full ./www path
-const REMOTE_ENDPOINT = `${config.Bouncer.Protocol}://${config.Bouncer.RemoteHostname}${config.Bouncer.RemotePort ? ':' + config.Bouncer.RemotePort : ''}`;
-const HOSTED_ENDPOINT = `${config.HttpServer.Protocol}://${config.HttpServer.LocalHostName ?? '*'}:${config.HttpServer.LocalPort}`; // defaults to binding all interfaces, indicate this
+const HTTP_CACHE_PATH = config.HttpServer.OutputOrOverridePath ?? path.join(DIR, 'www'); // defaults to full ./www path
+const REMOTE_ENDPOINT = `${config.Bouncer.Protocol ? config.Bouncer.Protocol + '://' : ''}${config.Bouncer.RemoteHostname}${config.Bouncer.RemotePort ? ':' + config.Bouncer.RemotePort : ''}`;
+const HOSTED_ENDPOINT = `${config.HttpServer.Protocol ? config.HttpServer.Protocol + '://' : ''}${config.HttpServer.LocalHostName}${config.HttpServer.LocalPort ? ':' + config.HttpServer.LocalPort : ''}`; // defaults to binding all interfaces, indicate this
 
 if (!fs.existsSync(HTTP_CACHE_PATH)) { // maybe in the future add a config option to deploy this in multiple directories
     fs.mkdirSync(HTTP_CACHE_PATH);
@@ -240,7 +240,7 @@ if (!fs.existsSync(LOG_PATH)) { // maybe in the future add a config option to de
 logger.LogCustom(`Program Started @ ${logger.CustomDate()}`, '⏰');
 logger.Info(`Remote Endpoint:\t${REMOTE_ENDPOINT}`);
 logger.Info(`Hosted Endpoint: \t${HOSTED_ENDPOINT}`);
-logger.Info(`Cache Path: \t\t${OVERRIDE_CACHE_PATH}`);
+logger.Info(`Cache Path: \t\t${HTTP_CACHE_PATH}`);
 logger.Info(`Directory Browser:\t${config.HttpServer.DirectoryBrowser ? 'enabled' : 'disabled'}`);
 logger.Info(`Bouncer:\t\t${config.Bouncer.Enabled ? 'enabled' : 'disabled'}`);
 logger.Info(`Writing Cache:\t${config.HttpServer.WriteCache ? 'enabled' : 'disabled'}`);
@@ -255,12 +255,12 @@ config.Logger.Requests && app.use(RequestLogger);
 
 app.get('/', async (req, res) => { // override root with cache viewer?
     if (config.HttpServer.DirectoryBrowser) {
-        res.send(DirectoryBrowser(OVERRIDE_CACHE_PATH, '/')); // send root folder hierarchy if DirectoryBrowser enabled.
-        config.Logger.Responses && logger.LogCustomTimed(`Serving directory browser: ${OVERRIDE_CACHE_PATH}`, '📁');
+        res.send(DirectoryBrowser(HTTP_CACHE_PATH, '/')); // send root folder hierarchy if DirectoryBrowser enabled.
+        config.Logger.Responses && logger.LogCustomTimed(`Serving directory browser: ${HTTP_CACHE_PATH}`, '📁');
         return;
     } else {
         let data = await GetData(REMOTE_ENDPOINT);
-        fs.writeFileSync(path.join(OVERRIDE_CACHE_PATH, 'index.html'), data);
+        fs.writeFileSync(path.join(HTTP_CACHE_PATH, 'index.html'), data);
         res.send(data);
         config.Logger.Responses && logger.LogCustomTimed(`Serving buffered: ${REMOTE_ENDPOINT}`, '👻');
         return;
@@ -310,42 +310,48 @@ app.get('/*resource', async (req, res) => {
     try {
         let parts = req.url.split('?');
         let [resource, querystring] = parts;
-        let absolute_path = path.join(OVERRIDE_CACHE_PATH, resource);
-        let [exists, is_directory] = FileInfo(absolute_path);
+        let remote_url;
+        if (REMOTE_ENDPOINT == '') {
+            remote_url = resource.slice(1) + (querystring ? '?' + querystring : '');
+        } else {
+            remote_url = REMOTE_ENDPOINT + resource + (querystring ? '?' + querystring : '');
+        }
+        let dst_filename = btoa(remote_url);
+        let absolute_path_safe = path.join(HTTP_CACHE_PATH, dst_filename);
+        let [exists, is_directory] = FileInfo(absolute_path_safe);
         if (is_directory) { // depends on 'exist' to be true
-            config.HttpServer.DirectoryBrowser ? res.send(DirectoryBrowser(absolute_path, req.url, true)) : res.sendStatus(403);
-            config.HttpServer.DirectoryBrowser ? config.Logger.Responses && logger.LogCustomTimed(`Serving directory browser: ${absolute_path}`, '📁') : logger.WarnTimed(`Directory browser is off [403]`);
+            config.HttpServer.DirectoryBrowser ? res.send(DirectoryBrowser(absolute_path_safe, req.url, true)) : res.sendStatus(403);
+            config.HttpServer.DirectoryBrowser ? config.Logger.Responses && logger.LogCustomTimed(`Serving directory browser: ${absolute_path_safe} (${remote_url})`, '📁') : logger.WarnTimed(`Directory browser is off [403]`);
             return;
         }
-        let remote_url = REMOTE_ENDPOINT + resource + (querystring ? '?' + querystring : '');
         let init_write = !exists && config.HttpServer.WriteCache;
         let re_write = exists && config.HttpServer.RewriteCache;
         if (init_write || re_write) { // write cache
             if (config.Bouncer.Enabled) {
                 let buffer = await GetBuffer(remote_url);
                 if (buffer instanceof Buffer) {
-                    let absolute_path_parent = path.dirname(absolute_path);
+                    let absolute_path_parent = path.dirname(absolute_path_safe);
                     if (!fs.existsSync(absolute_path_parent)) fs.mkdirSync(absolute_path_parent, { recursive: true });
-                    fs.writeFileSync(absolute_path, buffer);
-                    config.Logger.Info && init_write && logger.LogCustomTimed(`Initial write of ${absolute_path}`, '🔽');
-                    config.Logger.Info && re_write && logger.LogCustomTimed(`Re-write of ${absolute_path}`, '⏬');
-                    res.type(path.extname(absolute_path));
+                    fs.writeFileSync(absolute_path_safe, buffer);
+                    config.Logger.Info && init_write && logger.LogCustomTimed(`Initial write of ${absolute_path_safe} (${remote_url})`, '🔽');
+                    config.Logger.Info && re_write && logger.LogCustomTimed(`Re-write of ${absolute_path_safe} (${remote_url})`, '⏬');
+                    res.type(path.extname(absolute_path_safe));
                     res.send(buffer);
-                    config.Logger.Responses && logger.LogCustomTimed(`Serving buffered ${absolute_path}`, '👻');
+                    config.Logger.Responses && logger.LogCustomTimed(`Serving buffered ${absolute_path_safe} (${remote_url})`, '👻');
                     return;
                 }
             }
             res.sendStatus(503);
             return;
         } else if (exists && config.HttpServer.ServeCache) { // serve cache
-            config.Logger.Responses && logger.LogCustomTimed(`Serving cached ${absolute_path}`, '💿');
-            res.sendFile(absolute_path); // automatically sets response type.
+            config.Logger.Responses && logger.LogCustomTimed(`Serving cached ${absolute_path_safe} (${remote_url})`, '💿');
+            res.sendFile(absolute_path_safe); // automatically sets response type.
             return;
         } else if (config.Bouncer.Enabled) { // resort to buffering
             let buffer = await GetBuffer(remote_url);
             if (buffer instanceof Buffer) {
                 res.send(buffer);
-                config.Logger.Responses && logger.LogCustomTimed(`Serving buffered ${absolute_path}`, '👻');
+                config.Logger.Responses && logger.LogCustomTimed(`Serving buffered ${absolute_path_safe} (${remote_url})`, '👻');
                 return;
             }
             res.sendStatus(503);
@@ -359,7 +365,7 @@ app.get('/*resource', async (req, res) => {
 });
 
 app.post('/*resource', async (req, res) => {
-   console.log('Got a post request!', req.url);
+    console.log('Got a post request!', req.url);
 });
 
 let message = `🌐 HttpServer ${config.Bouncer.Enabled ? 'Proxying' : 'Running'}: ${HOSTED_ENDPOINT}${config.Bouncer.Enabled ? ' -> ' + REMOTE_ENDPOINT : ''}\n`;
