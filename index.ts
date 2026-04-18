@@ -316,7 +316,7 @@ app.get('/*resource', async (req, res) => {
         } else {
             remote_url = REMOTE_ENDPOINT + resource + (querystring ? '?' + querystring : '');
         }
-        let dst_filename = btoa(remote_url);
+        let dst_filename = /*encodeURIComponent*/(remote_url);
         let absolute_path_safe = path.join(HTTP_CACHE_PATH, dst_filename);
         let [exists, is_directory] = FileInfo(absolute_path_safe);
         if (is_directory) { // depends on 'exist' to be true
